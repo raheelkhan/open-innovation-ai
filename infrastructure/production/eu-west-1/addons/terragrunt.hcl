@@ -12,7 +12,7 @@ dependency "cluster" {
 }
 
 inputs = {
-  cluster_name = dependency.cluster.outputs.cluster_name
-  cluster_identity_oidc_issuer = dependency.cluster.outputs.cluster_identity_oidc_issuer
+  cluster_name                     = dependency.cluster.outputs.cluster_name
+  cluster_identity_oidc_issuer     = dependency.cluster.outputs.cluster_identity_oidc_issuer
   cluster_identity_oidc_issuer_arn = dependency.cluster.outputs.cluster_identity_oidc_issuer_arn
 }
