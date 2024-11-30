@@ -8,6 +8,7 @@ locals {
   aws_region   = local.region_vars.locals.aws_region
   environment  = local.account_vars.locals.environment
   profile      = local.global_vars.locals.profile
+
   default_tags = {
     Terraform   = "true"
     Environment = local.environment
