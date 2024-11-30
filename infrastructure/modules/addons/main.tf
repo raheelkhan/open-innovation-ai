@@ -23,3 +23,13 @@ module "eks-prometheus" {
   cluster_identity_oidc_issuer_arn = var.cluster_identity_oidc_issuer_arn
 }
 
+module "eks-argocd" {
+  source  = "lablabs/eks-argocd/aws"
+  version = "0.1.3"
+
+  cluster_identity_oidc_issuer     = var.cluster_identity_oidc_issuer
+  cluster_identity_oidc_issuer_arn = var.cluster_identity_oidc_issuer_arn
+
+  argo_enabled = true
+}
+
