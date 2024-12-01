@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend
+  labels:
+    open.innovation.ai/application: backend
+spec:
+  data:
+    RDS_ENDPOINT: {{ .Values.rds.endpoint }}
+    # The RDS credentials can be obtained by assing IRSA for the python application Pod

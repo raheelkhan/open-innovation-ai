@@ -1,0 +1,15 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend
+spec:
+  podSelector:
+    matchLabels:
+      open.innovation.ai/application: backend
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              open.innovation.ai/application: nginx
+  policyTypes:
+    - Ingress
