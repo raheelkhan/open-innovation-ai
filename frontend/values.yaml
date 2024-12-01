@@ -1,0 +1,42 @@
+replicaCount: 2
+
+image:
+  repository: nginx
+  tag: latest
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: alb
+  hosts:
+    - host: nginx.open.innovation.ai
+      paths:
+        - /
+
+autoscale:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 75
+
+serviceAccount:
+  enabled: true
+
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 3000
+  fsGroup: 2000
+  readOnlyRootFilesystem: true
+
+nodeSelector:
+  open.innovation.ai/node-type: cpu

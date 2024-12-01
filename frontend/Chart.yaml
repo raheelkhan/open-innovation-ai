@@ -1,0 +1,5 @@
+apiVersion: v2
+name: nginx-aws
+description: A Helm chart to deploy NGINX on EKS with ALB, HPA, and custom node affinity.
+version: 0.1.0
+appVersion: "1.0.0"
