@@ -1,0 +1,126 @@
+name: Infrastructure CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'infrastructure/**'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'infrastructure/**'
+
+jobs:
+  terragrunt:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v3
+
+      - name: Set up AWS OIDC authentication
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/github-actions-role
+          aws-region: us-east-1
+
+      - name: Install Terraform and Terragrunt
+        run: |
+          curl -LO https://github.com/hashicorp/terraform/releases/download/v1.6.0/terraform_1.6.0_linux_amd64.zip
+          unzip terraform_1.6.0_linux_amd64.zip
+          mv terraform /usr/local/bin/
+
+          curl -LO https://github.com/gruntwork-io/terragrunt/releases/download/v0.47.2/terragrunt_linux_amd64
+          mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+          chmod +x /usr/local/bin/terraform /usr/local/bin/terragrunt
+
+      - name: Run Terragrunt Plan for eu-west-1
+        id: plan_eu_west_1
+        run: |
+          cd infrastructure/production/eu-west-1
+          terragrunt plan
+        continue-on-error: true
+
+      - name: Upload eu-west-1 Plan for Review
+        uses: actions/upload-artifact@v3
+        with:
+          name: eu-west-1-plan
+          path: infrastructure/production/eu-west-1/terragrunt-plan.out
+
+      - name: Run Terragrunt Plan for us-east-1
+        id: plan_us_east_1
+        run: |
+          cd infrastructure/production/us-east-1
+          terragrunt plan
+        continue-on-error: true
+
+      - name: Upload us-east-1 Plan for Review
+        uses: actions/upload-artifact@v3
+        with:
+          name: us-east-1-plan
+          path: infrastructure/production/us-east-1/terragrunt-plan.out
+
+      - name: Run Terragrunt Plan for Global Resources
+        id: plan_global
+        run: |
+          cd infrastructure/production/global
+          terragrunt plan
+        continue-on-error: true
+
+      - name: Upload Global Plan for Review
+        uses: actions/upload-artifact@v3
+        with:
+          name: global-plan
+          path: infrastructure/production/global/terragrunt-plan.out
+
+      - name: Request Manual Approval
+        uses: peter-evans/manual-approval-action@v2
+        with:
+          approvers: "devops@openinnovation.ai"
+
+      - name: Apply Terragrunt for eu-west-1
+        if: ${{ success() && github.event.inputs.approved == 'true' }}
+        run: |
+          cd infrastructure/production/eu-west-1
+          terragrunt apply --auto-approve
+
+      - name: Apply Terragrunt for us-east-1
+        if: ${{ success() && github.event.inputs.approved == 'true' }}
+        run: |
+          cd infrastructure/production/us-east-1
+          terragrunt apply --auto-approve
+
+      - name: Apply Terragrunt for Global Resources
+        if: ${{ success() && github.event.inputs.approved == 'true' }}
+        run: |
+          cd infrastructure/production/global
+          terragrunt apply --auto-approve
+
+      - name: Send Notification Email
+        if: ${{ success() }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          from: 'github@openinnovation.ai'
+          to: 'devops@openinnovation.ai'
+          subject: 'Terragrunt Plan Awaiting Approval'
+          body: |
+            The Terragrunt plan for the infrastructure is ready and awaiting approval. Please review the plans in the GitHub Actions artifacts and approve the changes.
+
+  notify_on_failure:
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send failure notification email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          from: 'github@openinnovation.ai'
+          to: 'devops@openinnovation.ai'
+          subject: 'Terragrunt Plan Failed'
+          body: |
+            The Terragrunt plan has failed. Please check the GitHub Actions logs for more details.

@@ -1,0 +1,101 @@
+name: Frontend CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'frontend/**'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'frontend/**'
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up AWS OIDC authentication
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/github-actions-role
+          aws-region: us-east-1
+
+      - name: Set up Node.js (if needed)
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install dependencies (Optional)
+        run: |
+          cd frontend
+          npm install
+
+      - name: Run Linting and Quality Checks (Optional)
+        run: |
+          cd frontend
+          npm run lint
+        continue-on-error: true
+
+      - name: Build Docker Image
+        run: |
+          docker build -t my-frontend-app:$GITHUB_SHA frontend/
+
+      - name: Authenticate to Amazon ECR
+        run: |
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+
+      - name: Tag Docker Image
+        run: |
+          docker tag my-frontend-app:$GITHUB_SHA ${{ secrets.ECR_REGISTRY }}/my-frontend-app:$GITHUB_SHA
+
+      - name: Push Docker Image to ECR
+        run: |
+          docker push ${{ secrets.ECR_REGISTRY }}/my-frontend-app:$GITHUB_SHA
+
+      - name: Scan Docker Image for Vulnerabilities
+        run: |
+          aws ecr start-image-scan --repository-name my-frontend-app --image-id imageTag=$GITHUB_SHA
+        continue-on-error: true
+
+      - name: Update Helm Chart with New Image SHA
+        run: |
+          cd frontend/charts/my-frontend-app
+          sed -i "s/tag: .*/tag: $GITHUB_SHA/" values.yaml
+          git config user.email "action@github.com"
+          git config user.name "GitHub Actions"
+          git add values.yaml
+          git commit -m "Update image tag to $GITHUB_SHA"
+          git push origin master
+
+      - name: Send Deployment Notification Email
+        if: ${{ success() }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          from: 'github@openinnovation.ai'
+          to: 'devops@openinnovation.ai'
+          subject: 'Frontend Docker Image Pushed & Helm Chart Updated'
+          body: |
+            The Docker image for the frontend app has been successfully pushed to ECR and the Helm chart has been updated with the new image tag: $GITHUB_SHA.
+
+  notify_on_failure:
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send failure notification email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          from: 'github@openinnovation.ai'
+          to: 'devops@openinnovation.ai'
+          subject: 'Frontend CI/CD Pipeline Failed'
+          body: |
+            The frontend CI/CD pipeline failed at one of the steps. Please check the GitHub Actions logs for more details.
